@@ -1,0 +1,72 @@
+@RestController
+@RequestMapping("/api")
+public class HotelController {
+
+    @Autowired
+    private BookingService bookingService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody Map<String, String> userPayload) {
+        try {
+            String email = userPayload.get("email");
+            String aadhaarNo = userPayload.get("aadhaarNo");
+            User user = bookingService.registerUser(email, aadhaarNo);
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/rooms")
+    public ResponseEntity<List<Room>> getAvailableRooms(@RequestParam int people) {
+        List<Room> rooms = bookingService.getAvailableRooms(people);
+        return ResponseEntity.ok(rooms);
+    }
+
+    @PostMapping("/book")
+    public ResponseEntity<?> bookRoom(@RequestBody BookingRequest bookingRequest) {
+        try {
+            Booking booking = bookingService.bookRoom(
+                bookingRequest.getUserId(),
+                bookingRequest.getRoomId(),
+                bookingRequest.getNumberOfPeople(),
+                bookingRequest.getGuests()
+            );
+            return ResponseEntity.ok(booking);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/pay")
+    public ResponseEntity<?> makePayment(@RequestBody Map<String, String> paymentPayload) {
+        try {
+            Long bookingId = Long.parseLong(paymentPayload.get("bookingId"));
+            String method = paymentPayload.get("paymentMethod");
+            String result = bookingService.processPayment(bookingId, method);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException | NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+}
+
+public class BookingRequest {
+    private Long userId;
+    private Long roomId;
+    private int numberOfPeople;
+    private List<Guest> guests;
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public Long getRoomId() { return roomId; }
+    public void setRoomId(Long roomId) { this.roomId = roomId; }
+
+    public int getNumberOfPeople() { return numberOfPeople; }
+    public void setNumberOfPeople(int numberOfPeople) { this.numberOfPeople = numberOfPeople; }
+
+    public List<Guest> getGuests() { return guests; }
+    public void setGuests(List<Guest> guests) { this.guests = guests; }
+}
