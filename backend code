@@ -1,0 +1,149 @@
+@Entity
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Email
+    private String email;
+
+    @Column(unique = true)
+    private String aadhaarNo;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getAadhaarNo() { return aadhaarNo; }
+    public void setAadhaarNo(String aadhaarNo) { this.aadhaarNo = aadhaarNo; }
+}
+
+@Entity
+public class Room {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String roomType;
+    private int capacity;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getRoomType() { return roomType; }
+    public void setRoomType(String roomType) { this.roomType = roomType; }
+    public int getCapacity() { return capacity; }
+    public void setCapacity(int capacity) { this.capacity = capacity; }
+}
+
+@Entity
+public class Booking {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    private User user;
+
+    @ManyToOne
+    private Room room;
+
+    private int numberOfPeople;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    private List<Guest> guests = new ArrayList<>();
+
+    private boolean paymentDone;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public Room getRoom() { return room; }
+    public void setRoom(Room room) { this.room = room; }
+    public int getNumberOfPeople() { return numberOfPeople; }
+    public void setNumberOfPeople(int numberOfPeople) { this.numberOfPeople = numberOfPeople; }
+    public List<Guest> getGuests() { return guests; }
+    public void setGuests(List<Guest> guests) { this.guests = guests; }
+    public boolean isPaymentDone() { return paymentDone; }
+    public void setPaymentDone(boolean paymentDone) { this.paymentDone = paymentDone; }
+}
+
+@Entity
+public class Guest {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private String phoneNumber;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+}
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+    Optional<User> findByAadhaarNo(String aadhaarNo);
+}
+
+public interface RoomRepository extends JpaRepository<Room, Long> {
+    List<Room> findByCapacityGreaterThanEqual(int capacity);
+}
+
+public interface BookingRepository extends JpaRepository<Booking, Long> {}
+
+@Service
+public class BookingService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoomRepository roomRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    public User registerUser(String email, String aadhaarNo) {
+        if(userRepository.findByEmail(email).isPresent() || userRepository.findByAadhaarNo(aadhaarNo).isPresent()) {
+            throw new RuntimeException("User already exists");
+        }
+        User user = new User();
+        user.setEmail(email);
+        user.setAadhaarNo(aadhaarNo);
+        return userRepository.save(user);
+    }
+
+    public List<Room> getAvailableRooms(int forPeople) {
+        return roomRepository.findByCapacityGreaterThanEqual(forPeople);
+    }
+
+    public Booking bookRoom(Long userId, Long roomId, int numberOfPeople, List<Guest> guests) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        Room room = roomRepository.findById(roomId).orElseThrow(() -> new RuntimeException("Room not found"));
+        if(numberOfPeople > room.getCapacity()) {
+            throw new RuntimeException("Room capacity exceeded");
+        }
+        Booking booking = new Booking();
+        booking.setUser(user);
+        booking.setRoom(room);
+        booking.setNumberOfPeople(numberOfPeople);
+        booking.getGuests().addAll(guests);
+        booking.setPaymentDone(false);
+        return bookingRepository.save(booking);
+    }
+
+    public String processPayment(Long bookingId, String paymentMethod) {
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        if(!paymentMethod.equalsIgnoreCase("gpay") && !paymentMethod.equalsIgnoreCase("phonepe")) {
+            throw new RuntimeException("Invalid payment method");
+        }
+        booking.setPaymentDone(true);
+        bookingRepository.save(booking);
+        return "Payment processed successfully via " + paymentMethod;
+    }
+}
